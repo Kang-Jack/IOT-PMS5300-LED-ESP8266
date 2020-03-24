@@ -13,3 +13,9 @@ char msg[40];
 char playload[40];
 
 char float_str_temp[8];
+
+
+float temp;
+//float hum;
+float pres;
+float alti;

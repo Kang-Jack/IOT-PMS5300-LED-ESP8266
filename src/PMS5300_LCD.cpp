@@ -6,6 +6,8 @@
 #include "ESP_PMS5003S.h"
 #include "AM232X.h"
 
+#include <Adafruit_BMP280.h>
+
 AM232X AM2320;
 
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -13,14 +15,45 @@ AM232X AM2320;
 const int pinSDA = D2;
 const int pinSCL = D1;
 const int buttonPin = D5;//14;    // the number of the pushbutton pin
-
+bool bmpStatus =false;
 SSD1306Wire  display(0x3c, pinSDA, pinSCL);
+
+Adafruit_BMP280 bmp; // use I2C interface
 
 
 const int delayTime = 4000; 
 const int waittingSec = 60;
 int workingSec = 60;
 int reading = LOW;
+
+
+bool InitBmp(){
+  int i=0;
+  bool isOK=false;
+  while (i<10){
+    if (!bmp.begin(0x76)) {
+      Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
+        i++;
+        delay(10);
+      }
+    else
+    {
+      isOK=true;
+      i=10;
+        /* Default settings from datasheet. */
+     // bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+      //                Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+      //                Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+       //               Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+        //              Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+
+    }
+    return isOK;
+  }
+
+}
+
+
 void readInput(){
   if(reading==LOW){
       reading = digitalRead(buttonPin);
@@ -79,19 +112,65 @@ void display_AM2320_Humidity(int status) {
     delay(2000);
    }
 }
-void display_AM2320_last_temp() {
+void display_last_temp() {
     readInput();
     display.clear();  
     set_m_text();
     display.drawString(0,0,"Last Temp & Humi");
     set_m_text();
-    display.drawString(0,22,String(AM2320.temperature));
+    //display.drawString(0,22,String(AM2320.temperature));
+    display.drawString(0,22,String(temp));
     display.drawString(45,22, "*C");
     display.drawString(0,44, String(AM2320.humidity));
     display.drawString(45,44, "%");
     display.display();
     delay(delayTime);
 }
+void display_bme_last_Pressure() {
+    readInput();
+    display.clear();  
+    set_m_text();
+    display.drawString(0,0,"Last Pres & Alti");
+    set_m_text();
+    display.drawString(0,22,String(String(pres)));
+    display.drawString(60,22, "hPa");
+    display.drawString(0,44, String(alti));
+    display.drawString(60,44, "M");
+    display.display();
+    delay(delayTime);
+}
+
+void display_bmp_temp() {
+    readInput();
+    display.clear();  
+    set_m_text();
+    display.drawString(0,0,"Temperature (*C)");
+    set_b_text();
+    display.drawString(0,22, String(temp));
+    display.display();
+    delay(delayTime);
+}
+void display_bmp_Pressure() {
+    readInput();
+    display.clear();  
+    set_m_text();
+    display.drawString(0,0,"Pressure (hPa)");
+    set_b_text();
+    display.drawString(0,22, String(pres));
+    display.display();
+    delay(delayTime);
+}
+void display_bmp_Altitude() {
+    readInput();
+    display.clear();  
+    set_m_text();
+    display.drawString(0,0,"Altitude (M)");
+    set_b_text();
+    display.drawString(0,22, String(alti));
+    display.display();
+    delay(delayTime);
+}
+
 void display_AQI2_5() {
     readInput();
     display.clear();  
@@ -138,13 +217,21 @@ void display_last_AQI() {
     delay(delayTime);
 }
 
-void handleAM2320(){
+void handleTHP(){
      if (workingSec>=1){
       int status = AM2320.read();
       Serial.println(String(status));
       Serial.println(String(AM232X_OK));
-      display_AM2320_temp(status);
+      //display_AM2320_temp(status);
+      if (bmpStatus){
+        temp = bmp.readTemperature();
+        pres = bmp.readPressure() / 100.0F;
+        alti = bmp.readAltitude(SEALEVELPRESSURE_HPA);
+      }
+      display_bmp_temp();
       display_AM2320_Humidity(status);
+      display_bmp_Pressure();
+      display_bmp_Altitude();
      }
     
  }
@@ -153,6 +240,12 @@ void setup(void){
   AM2320.begin(pinSDA, pinSCL);
   Serial.begin(115200);
   init_oled();
+  bmpStatus=InitBmp();
+  if (!bmpStatus){
+    set_m_text();
+    new_screen_oled(0,0,"No valid BMP280 sensor");
+    delay(5000);
+  }
   setupPMS5003S();
   pinMode(buttonPin, INPUT);
   Serial.println("start");
@@ -182,7 +275,7 @@ void loop(void){
     sleep();
   }
   handlePMS5003S();
-  handleAM2320();
+  handleTHP();
   if (workingSec>=1)
   {
       set_m_text();
@@ -196,7 +289,9 @@ void loop(void){
     delay(500);  
     display_last_AQI();
     delay(500); 
-    display_AM2320_last_temp();
+    display_last_temp();
+    delay(500);
+    display_bme_last_Pressure                                                                                                                                                         ();
     delay(500); 
   }
 
