@@ -25,4 +25,4 @@ const int delayTime = 4000;
 const int waittingSec = 60;
 int workingSec = 60;
 
-int reading = 0l;
+int reading = 0;
